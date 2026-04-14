@@ -1,5 +1,4 @@
 # Model checkpoints (too large for git)
-results/
 *.pth
 
 # Dataset
