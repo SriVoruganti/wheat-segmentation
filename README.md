@@ -107,7 +107,7 @@ python evaluate.py \
 
 ---
 
-## HD Experiments
+## Experiments
 
 ### Robustness Testing
 
