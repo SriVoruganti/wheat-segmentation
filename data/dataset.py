@@ -1,5 +1,6 @@
 """
-EWS Dataset loader with support for:
+EWS Dataset loader for Random Forest with support for:
+  - Automatic preprocessing (images/masks folder creation)
   - Standard train/val/test loading
   - Subset sampling for data scarcity experiments
   - Label noise injection for robustness analysis
@@ -7,52 +8,61 @@ EWS Dataset loader with support for:
 
 import os
 import random
+import shutil
 import numpy as np
-from PIL import Image
-import torch
-from torch.utils.data import Dataset
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+import cv2
 
 
-class EWSDataset(Dataset):
+class EWSDataset:
     """
-    Eschikon Wheat Segmentation (EWS) Dataset.
+    Eschikon Wheat Segmentation (EWS) Dataset for Random Forest.
 
-    Directory structure expected:
+    Handles preprocessing automatically — if images/ and masks/
+    subdirectories don't exist, they are created and files are
+    sorted into them based on the _mask.png naming convention.
+
+    Directory structure after preprocessing:
         root/
             train/images/*.png   train/masks/*.png
             val/images/*.png     val/masks/*.png
             test/images/*.png    test/masks/*.png
 
     Args:
-        root:         Path to EWS dataset root.
-        split:        'train', 'val', or 'test'.
-        transform:    Albumentations pipeline.
-        subset_frac:  Float in (0, 1] — use only this fraction of the split.
-                      Useful for data scarcity experiments.
-        label_noise:  Float in [0, 1) — randomly flip this fraction of mask
-                      pixels to simulate noisy annotation.
-        seed:         Random seed for reproducibility.
+        root:               Path to EWS dataset root.
+        split:              'train', 'val', or 'test'.
+        max_pixels_per_image: Max pixels to sample per image.
+                              Keeps memory manageable.
+        subset_frac:        Float in (0, 1] — use only this fraction
+                            of the split. For data scarcity experiments.
+        label_noise:        Float in [0, 1) — randomly flip this fraction
+                            of mask pixels. For robustness analysis.
+        seed:               Random seed for reproducibility.
     """
 
     def __init__(
         self,
-        root:        str,
-        split:       str   = "train",
-        transform          = None,
-        subset_frac: float = 1.0,
-        label_noise: float = 0.0,
-        seed:        int   = 42,
+        root:                 str,
+        split:                str   = "train",
+        max_pixels_per_image: int   = 5000,
+        subset_frac:          float = 1.0,
+        label_noise:          float = 0.0,
+        seed:                 int   = 42,
     ):
         assert split in ("train", "val", "test"), f"Invalid split: '{split}'"
-        assert 0 < subset_frac <= 1.0, "subset_frac must be in (0, 1]"
-        assert 0 <= label_noise < 1.0, "label_noise must be in [0, 1)"
+        assert 0 < subset_frac <= 1.0,  "subset_frac must be in (0, 1]"
+        assert 0 <= label_noise < 1.0,  "label_noise must be in [0, 1)"
 
-        self.image_dir   = os.path.join(root, split, "images")
-        self.mask_dir    = os.path.join(root, split, "masks")
-        self.transform   = transform
-        self.label_noise = label_noise
+        self.root                 = root
+        self.split                = split
+        self.max_pixels_per_image = max_pixels_per_image
+        self.label_noise          = label_noise
+        self.seed                 = seed
+
+        # Run preprocessing if needed
+        self._preprocess_folders()
+
+        self.image_dir = os.path.join(root, split, "images")
+        self.mask_dir  = os.path.join(root, split, "masks")
 
         images = sorted(os.listdir(self.image_dir))
         masks  = sorted(os.listdir(self.mask_dir))
@@ -60,7 +70,7 @@ class EWSDataset(Dataset):
             f"Mismatch: {len(images)} images vs {len(masks)} masks"
         )
 
-        # Subset sampling
+        # Subset sampling — mirrors original EWSDataset
         if subset_frac < 1.0:
             rng = random.Random(seed)
             n   = max(1, int(len(images) * subset_frac))
@@ -68,75 +78,102 @@ class EWSDataset(Dataset):
             images = [images[i] for i in sorted(idx)]
             masks  = [masks[i]  for i in sorted(idx)]
 
-        self.images = images
-        self.masks  = masks
+        self.image_files = images
+        self.mask_files  = masks
 
-    def __len__(self):
-        return len(self.images)
+    # ------------------------------------------------------------------
+    # Preprocessing
+    # ------------------------------------------------------------------
 
-    def __getitem__(self, idx):
-        img_path  = os.path.join(self.image_dir, self.images[idx])
-        mask_path = os.path.join(self.mask_dir,  self.masks[idx])
+    def _preprocess_folders(self):
+        """
+        Creates images/ and masks/ subdirectories and moves files
+        into them if they don't already exist. Safe to re-run.
+        """
 
-        image = np.array(Image.open(img_path).convert("RGB"),  dtype=np.float32)
-        mask  = np.array(Image.open(mask_path).convert("L"),   dtype=np.float32)
-        mask  = (mask > 127).astype(np.float32)
+        source_dir = os.path.join(self.root, "validation")
+        target_dir = os.path.join(self.root, "val")
+        if os.path.exists(source_dir) and not os.path.exists(target_dir):
+            os.rename(source_dir, target_dir)
 
-        # Inject label noise (flip random pixels)
-        if self.label_noise > 0:
-            noise_map = np.random.rand(*mask.shape) < self.label_noise
-            mask      = np.where(noise_map, 1.0 - mask, mask)
+        split_dir  = os.path.join(self.root, self.split)
+        images_dir = os.path.join(split_dir, "images")
+        masks_dir  = os.path.join(split_dir, "masks")
 
-        if self.transform:
-            aug   = self.transform(image=image, mask=mask)
-            image = aug["image"]
-            mask  = aug["mask"]
+        os.makedirs(images_dir, exist_ok=True)
+        os.makedirs(masks_dir,  exist_ok=True)
 
-        if isinstance(mask, torch.Tensor):
-            mask = mask.unsqueeze(0)
-        else:
-            mask = torch.tensor(mask).unsqueeze(0)
+        for file in sorted(os.listdir(split_dir)):
+            file_path = os.path.join(split_dir, file)
 
-        return image, mask
+            if os.path.isdir(file_path):
+                continue
+            if not file.lower().endswith(".png"):
+                continue
+
+            dest = os.path.join(
+                masks_dir  if "_mask.png" in file else images_dir,
+                file
+            )
+
+            if not os.path.exists(dest):
+                shutil.move(file_path, dest)
+
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
+    def load(self):
+        """
+        Loads all images and masks into a flat numpy feature matrix.
+
+        Returns:
+            X: (n_pixels, 3)  — RGB features per pixel
+            y: (n_pixels,)    — binary label per pixel (0=background, 1=wheat)
+        """
+        np.random.seed(self.seed)
+
+        X_list = []
+        y_list = []
+
+        for img_file, mask_file in zip(self.image_files, self.mask_files):
+            img_path  = os.path.join(self.image_dir, img_file)
+            mask_path = os.path.join(self.mask_dir,  mask_file)
+
+            # Load image (BGR → RGB) and mask (greyscale)
+            image = cv2.imread(img_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+            mask  = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+            # Binarise mask — same threshold as original EWSDataset
+            mask = (mask > 127).astype(np.float32)
+
+            # Inject label noise — mirrors original EWSDataset
+            if self.label_noise > 0:
+                noise_map = np.random.rand(*mask.shape) < self.label_noise
+                mask      = np.where(noise_map, 1.0 - mask, mask)
+
+            # Flatten and subsample
+            H, W, C = image.shape
+            pixels  = image.reshape(-1, C)
+            labels  = mask.reshape(-1)
+
+            idx = np.random.choice(
+                len(pixels),
+                size=min(self.max_pixels_per_image, len(pixels)),
+                replace=False
+            )
+            X_list.append(pixels[idx])
+            y_list.append(labels[idx])
+
+        X = np.vstack(X_list)
+        y = np.concatenate(y_list)
+
+        return X, y
 
     def get_filename(self, idx: int) -> str:
-        return self.images[idx]
+        """Mirrors original EWSDataset.get_filename()."""
+        return self.image_files[idx]
 
-
-# ---------------------------------------------------------------------------
-# Augmentation pipelines
-# ---------------------------------------------------------------------------
-
-def get_train_transforms(image_size: int = 350) -> A.Compose:
-    """Comprehensive augmentation for training on a small dataset."""
-    return A.Compose([
-        A.Resize(image_size, image_size),
-        # Geometric
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.RandomRotate90(p=0.5),
-        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=30, p=0.5),
-        A.ElasticTransform(alpha=1, sigma=50, p=0.3),
-        A.GridDistortion(p=0.3),
-        # Colour / photometric
-        A.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1, p=0.6),
-        A.RandomGamma(gamma_limit=(80, 120), p=0.3),
-        # Noise & blur
-        A.GaussianBlur(blur_limit=(3, 7), p=0.3),
-        A.GaussNoise(var_limit=(10, 50), p=0.3),
-        A.ISONoise(p=0.2),
-        # Occlusion
-        A.CoarseDropout(max_holes=8, max_height=30, max_width=30, p=0.3),
-        # Normalise
-        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        ToTensorV2(),
-    ])
-
-
-def get_val_transforms(image_size: int = 350) -> A.Compose:
-    """No augmentation for validation and testing."""
-    return A.Compose([
-        A.Resize(image_size, image_size),
-        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        ToTensorV2(),
-    ])
+    def __len__(self):
+        return len(self.image_files)
