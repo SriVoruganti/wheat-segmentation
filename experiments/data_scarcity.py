@@ -1,5 +1,5 @@
 """
-Data Scarcity Experiment (HD requirement).
+Data Scarcity Experiment.
 
 Trains the model with varying fractions of the training set (25%, 50%, 75%, 100%)
 and plots how performance degrades. Also optionally injects label noise to analyse
