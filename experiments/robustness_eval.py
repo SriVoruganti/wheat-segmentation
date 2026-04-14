@@ -1,5 +1,5 @@
 """
-Robustness Evaluation Experiment (HD requirement).
+Robustness Evaluation Experiment.
 
 Evaluates how the trained model performs under various realistic image
 distortions: noise, blur, low brightness/contrast, occlusion, compression.
