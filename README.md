@@ -1,4 +1,4 @@
-# comp9517-wheat-segmentation (Deep Learning — HD)
+# comp9517-wheat-segmentation
 
 Deep learning-based wheat crop segmentation using the EWS dataset — UNSW COMP9517 Group Project 2026 T1
 
