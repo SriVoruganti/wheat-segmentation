@@ -1,0 +1,21 @@
+#!/bin/bash
+#PBS -N wheat_unet
+#PBS -l select=1:ncpus=4:ngpus=1:mem=16gb
+#PBS -l walltime=4:00:00
+#PBS -j oe
+#PBS -m ae
+#PBS -M z5457565@ad.unsw.edu.au
+
+cd $PBS_O_WORKDIR
+module load cuda/12.1.0
+source /srv/scratch/z5457565/venv/bin/activate
+
+python train.py \
+    --model pretrained \
+    --data_root ./EWS-Dataset \
+    --loss focal_dice \
+    --epochs 40 \
+    --two_phase \
+    --phase1_epochs 10 \
+    --batch_size 8 \
+    --num_workers 4
