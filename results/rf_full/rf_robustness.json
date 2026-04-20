@@ -1,0 +1,74 @@
+[
+  {
+    "distortion": "clean",
+    "iou": 0.5746317673742238,
+    "f1": 0.7039490181425738,
+    "std_iou": 0.2115994570173833,
+    "ms_img": 1750.3494833314714,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "low_contrast",
+    "iou": 0.4614906471504013,
+    "f1": 0.6023691479970988,
+    "std_iou": 0.20481402842469162,
+    "ms_img": 1728.83498333249,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "low_brightness",
+    "iou": 0.4725418232090666,
+    "f1": 0.6204854518011683,
+    "std_iou": 0.18273907611802215,
+    "ms_img": 1315.9538333347882,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "gaussian_noise_mild",
+    "iou": 0.40735161524875513,
+    "f1": 0.543786264471227,
+    "std_iou": 0.2089882928872248,
+    "ms_img": 1864.1099000014947,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "gaussian_noise_strong",
+    "iou": 0.2701377915692183,
+    "f1": 0.4023924674093353,
+    "std_iou": 0.1487179865832647,
+    "ms_img": 1572.1825958341167,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "occlusion",
+    "iou": 0.5487831168872095,
+    "f1": 0.6854397481344813,
+    "std_iou": 0.19588301413382053,
+    "ms_img": 1670.0656458342564,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "blur_mild",
+    "iou": 0.6010104000431821,
+    "f1": 0.727396679330718,
+    "std_iou": 0.20411429593506433,
+    "ms_img": 1515.6746874999953,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "blur_strong",
+    "iou": 0.5856672151211301,
+    "f1": 0.7129159229473299,
+    "std_iou": 0.21009771901426008,
+    "ms_img": 1291.7346833322274,
+    "feature_mode": "rgb_hsv_exg"
+  },
+  {
+    "distortion": "jpeg_compression",
+    "iou": 0.49517054731432636,
+    "f1": 0.628005484122852,
+    "std_iou": 0.2227170262785308,
+    "ms_img": 1166.2526125001023,
+    "feature_mode": "rgb_hsv_exg"
+  }
+]

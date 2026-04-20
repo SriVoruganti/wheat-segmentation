@@ -18,6 +18,7 @@ def load_image_rgb_u8(p: Path) -> np.ndarray:
     if bgr is None:
         raise FileNotFoundError(f"Could not read image: {p}")
     return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+feature_mode = "rgb_hsv_exg"
 
 def load_gt_mask01(p: Path) -> np.ndarray:
     m = cv2.imread(str(p), cv2.IMREAD_UNCHANGED)
@@ -146,7 +147,7 @@ def make_distortions(seed=0):
 # -----------------------------
 def main():
     # IMPORTANT: set this to match how your saved model was trained
-    feature_mode = "rgb"  # change to "rgb_hsv_exg" if your saved model expects 7 features
+    feature_mode = "rgb_hsv_exg"
 
     data_root = Path("data/EWS-Dataset")
     img_dir = data_root / "test" / "images"
@@ -162,7 +163,7 @@ def main():
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     # Load trained RF model
-    model_path = Path("results/rf_model.pkl")
+    model_path = Path("results/rf_model_rgb_hsv_exg.pkl")
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path} (update path in rf_robustness.py)")
 
@@ -211,7 +212,7 @@ def main():
         print(f"{name:>18s} | IoU {row['iou']:.4f} | F1 {row['f1']:.4f} | ms/img {row['ms_img']:.1f}")
 
     # Save JSON
-    out_path = out_dir / "rf_robustness.json"
+    out_path = out_dir / f"rf_robustness_{feature_mode}.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print("Saved:", out_path)
@@ -231,7 +232,7 @@ def main():
     plt.legend()
     plt.tight_layout()
 
-    fig_path = fig_dir / "rf_robustness.png"
+    fig_path = fig_dir / f"rf_robustness_{feature_mode}.png"
     plt.savefig(fig_path, dpi=200)
     print("Saved:", fig_path)
 
