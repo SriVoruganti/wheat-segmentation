@@ -9,7 +9,7 @@ From the project root (directory containing `data/`, `models/`, ...):
     # Single-image qualitative visualisation
     python -m experiments.evaluate_advanced --mode single --index 1
 
-    # Batch evaluation (prints average IoU over a list of indices)
+    # Batch evaluation (prints Precision / Recall / F1 / IoU per method)
     python -m experiments.evaluate_advanced --mode batch \\
         --indices 0 1 2 3 4 5 6 7 8 9 10 11 12
 
@@ -33,7 +33,7 @@ from models.advanced_segmentation import (
     segment_wheat_watershed,
     segment_wheat_superpixel,
 )
-from utils.classical_metrics import calculate_iou
+from utils.classical_metrics import calculate_iou, calculate_all_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -81,18 +81,24 @@ def evaluate_all_methods(folder_path, index: int = 0, save_path: str | None = No
 
 
 # ---------------------------------------------------------------------------
-# Batch evaluation (text-only table)
+# Batch evaluation (Precision / Recall / F1 / IoU)
 # ---------------------------------------------------------------------------
 
 def test_multiple_images_text(folder_path, indices):
-    """Print a table of IoU scores for Watershed and Superpixel on each index."""
+    """
+    Print a per-image IoU table (Watershed vs. Superpixel) followed by a
+    summary of the average Precision, Recall, F1 and IoU for each method.
+    """
     methods = {
         "Watershed":  segment_wheat_watershed,
         "Superpixel": segment_wheat_superpixel,
     }
-    # collect IoU-values per method
-    scores = {name: [] for name in methods}
 
+    # per-method: list of metric dicts, one per image
+    all_metrics = {name: [] for name in methods}
+
+    # --- Per-image IoU table 
+    print("\n--- Per-image IoU values (Watershed vs. Superpixel) ---")
     print(f"{'img(index)':<10} {'Watershed':>12} {'Superpixel':>12}")
     print("-" * 38)
 
@@ -100,18 +106,33 @@ def test_multiple_images_text(folder_path, indices):
         image_rgb, true_mask, _ = load_image_and_mask(folder_path, idx)
         row = f"{idx:<10}"
         for name, fn in methods.items():
-            iou = calculate_iou(true_mask, fn(image_rgb))
-            scores[name].append(iou)
-            row += f"{iou:>12.4f}"
+            pred = fn(image_rgb)
+            metrics = calculate_all_metrics(true_mask, pred)
+            all_metrics[name].append(metrics)
+            row += f"{metrics['iou']:>12.4f}"
         print(row)
 
     print("-" * 38)
     avg_row = f"{'Average:':<10}"
     for name in methods:
-        avg_row += f"{np.mean(scores[name]):>12.4f}"
+        avg_iou = np.mean([m["iou"] for m in all_metrics[name]])
+        avg_row += f"{avg_iou:>12.4f}"
     print(avg_row)
 
-    return scores
+    # --- Full metrics summary table 
+    print("\n=== Average metrics across all images ===")
+    print("-" * 58)
+    print(f"{'Method':<14} {'Precision':>10} {'Recall':>10} {'F1':>10} {'IoU':>10}")
+    print("-" * 58)
+    for name in methods:
+        avg_p   = np.mean([m["precision"] for m in all_metrics[name]])
+        avg_r   = np.mean([m["recall"]    for m in all_metrics[name]])
+        avg_f1  = np.mean([m["f1"]        for m in all_metrics[name]])
+        avg_iou = np.mean([m["iou"]       for m in all_metrics[name]])
+        print(f"{name:<14} {avg_p:>10.4f} {avg_r:>10.4f} {avg_f1:>10.4f} {avg_iou:>10.4f}")
+    print("=" * 58)
+
+    return all_metrics
 
 
 # ---------------------------------------------------------------------------
