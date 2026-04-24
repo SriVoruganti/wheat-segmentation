@@ -1,6 +1,10 @@
 # Model checkpoints (too large for git)
 *.pth
 
+# outputs
+results/
+*.pkl
+
 # Dataset
 EWS-Dataset/
 

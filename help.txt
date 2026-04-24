@@ -1,13 +1,75 @@
-# Set dataset root (session only)
-$env:EWS_ROOT = "C:\absolute\path\to\EWS"
+Train RF
+    Train RGB only:
+    python -m scripts.train_RF --feature_mode rgb --out_dir .\results\rf_full
 
-# Train RF (choose feature mode)
-$env:RF_FEATURE_MODE = "rgb"   # rgb | rgb+exg | rgb+hsv | rgb+hsv+exg
-python train_RF.py
+    Train RGB+ExG:
+    python -m scripts.train_RF --feature_mode rgb_exg --out_dir .\results\rf_full
 
-# Evaluate on test split
-$env:RF_MODEL = "rf_rgb.joblib"  # update if you trained a different mode
-python .\rf_eval_batch.py
+    Train RGB+HSV:
+    python -m scripts.train_RF --feature_mode rgb_hsv --out_dir .\results\rf_full
 
-# (Optional) Save slide-ready panels
-python .\rf_save_panels.py
+    Train RGB+HSV+ExG:
+    python -m scripts.train_RF --feature_mode rgb_hsv_exg --out_dir .\results\rf_full
+
+Evaluate RF on the test set (per-image metrics)
+
+    Evaluate your final model (RGB+HSV+ExG)
+    python -m scripts.eval_RF --data_root .\data\EWS-Dataset --split test --model_path .\results\rf_model_rgb_hsv_exg.pkl --feature_mode rgb_hsv_exg
+
+    With flip-augmentation voting + visual outputs
+    python -m scripts.eval_RF --data_root .\data\EWS-Dataset --split test --model_path .\results\rf_model_rgb_hsv_exg.pkl --feature_mode rgb_hsv_exg --flip_aug --visualise --failure_analysis
+
+    Outputs:
+        Metrics JSON:  results/rf_full/test_metrics_rf_<tag>.json 
+        Example figures:  results/rf_full/figures/ 
+        Failure analysis:  results/rf_full/figures/failures/ 
+        Where  <tag>  is  no_aug  or  flip_aug .
+
+    Evaluate other feature modes
+    --model_path  (model trained with that feature mode)   
+    --feature_mode  (must match)
+    Example (RGB-only model):
+        python -m scripts.eval_RF --data_root .\data\EWS-Dataset --split test --model_path .\results\rf_model_rgb_hsv_exg.pkl --feature_mode rgb_hsv_exg
+
+____________________
+
+Save best/median/worst qualitative panels
+    python -m scripts.rf_save_panels --data_root .\data\EWS-Dataset --split test --model_path .\results\rf_model_rgb_hsv_exg.pkl --feature_mode rgb_hsv_exg --out_dir .\results\rf_full\panels
+
+
+
+____________________
+Data Scarcity
+    1) Default run (RGB, 25/50/75/100)
+    python .\experiments\data_scarcity_RF.py
+
+
+    2) Run a single feature mode (recommended for report figures)
+    python .\experiments\data_scarcity_RF.py --feature_mode rgb_hsv_exg
+
+    3) Run all feature modes (produces per-mode plots + a comparison plot)
+    python .\experiments\data_scarcity_RF.py --feature_mode all
+    
+____________________
+Robustness
+    Default (val split, uses rgb_hsv_exg model path default)
+    python .\experiments\rf_robustness.py
+
+    Explicit model + test split
+    python .\experiments\rf_robustness.py --split test --feature_mode rgb_hsv_exg --model_path .\results\rf_full\rf_model_rgb_hsv_exg.pkl
+
+    Change randomness of noise/occlusion (different distortion seed)
+    python .\experiments\rf_robustness.py --split val --seed 1
+
+____________________
+1) Feature ablation script (experiments/rf_feature_ablation.py)
+
+    Default (train on train, evaluate on val)
+    python .\experiments\rf_feature_ablation.py
+
+    Evaluate on test (only when you’re done tuning)
+    python .\experiments\rf_feature_ablation.py --split test
+
+    Faster run (fewer trees + fewer pixels per image)
+    python .\experiments\rf_feature_ablation.py --split val --n_estimators 100 --max_pixels_per_image 2000
+
