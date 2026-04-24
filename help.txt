@@ -1,0 +1,13 @@
+# Set dataset root (session only)
+$env:EWS_ROOT = "C:\absolute\path\to\EWS"
+
+# Train RF (choose feature mode)
+$env:RF_FEATURE_MODE = "rgb"   # rgb | rgb+exg | rgb+hsv | rgb+hsv+exg
+python train_RF.py
+
+# Evaluate on test split
+$env:RF_MODEL = "rf_rgb.joblib"  # update if you trained a different mode
+python .\rf_eval_batch.py
+
+# (Optional) Save slide-ready panels
+python .\rf_save_panels.py
